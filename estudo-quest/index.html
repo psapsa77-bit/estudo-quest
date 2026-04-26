@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#07090F" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="EstudoQuest" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>Codex do Estudante</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #07090F;
+      --surface: rgba(255,255,255,0.025);
+      --border: rgba(255,255,255,0.06);
+      --text: #D4C9A8;
+      --text-muted: rgba(212,201,168,0.45);
+      --gold: #E8A44A;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bot: env(safe-area-inset-bottom, 0px);
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'EB Garamond', Georgia, serif; overflow-x: hidden; }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes xpFloat  { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-60px) scale(1.4)} }
+    @keyframes particle { 0%{opacity:1;transform:translate(0,0) scale(1)} 100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(0)} }
+    @keyframes shimmer  { 0%{background-position:-200% center} 100%{background-position:200% center} }
+    @keyframes barGrow  { from{width:0} }
+    @keyframes orbPulse { 0%,100%{opacity:.15;transform:scale(1)} 50%{opacity:.28;transform:scale(1.12)} }
+    @keyframes toastIn  { 0%{opacity:0;transform:translateX(-50%) translateY(16px)} 12%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0;transform:translateX(-50%) translateY(-12px)} }
+    @keyframes rewardPop{ 0%{opacity:0;transform:translate(-50%,-50%) scale(.6)} 15%{opacity:1;transform:translate(-50%,-50%) scale(1.05)} 20%{transform:translate(-50%,-50%) scale(1)} 80%{opacity:1} 100%{opacity:0;transform:translate(-50%,-50%) scale(.9)} }
+    @keyframes slideUp  { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes spin     { to{transform:rotate(360deg)} }
+
+    /* ── LAYOUT ── */
+    #app { min-height: 100dvh; display: flex; flex-direction: column; padding-bottom: calc(16px + var(--safe-bot)); }
+
+    /* ── AMBIENT ── */
+    .orb { position:fixed; border-radius:50%; pointer-events:none; animation:orbPulse 7s ease-in-out infinite; }
+
+    /* ── HEADER ── */
+    #header {
+      position: sticky; top: 0; z-index: 200;
+      background: rgba(7,9,15,.96); backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(212,201,168,.07);
+      padding: calc(var(--safe-top) + 14px) 18px 12px;
+    }
+    .header-row { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+    .level-label { font-family:'Playfair Display',serif; font-size:10px; letter-spacing:5px; color:rgba(212,201,168,.35); text-transform:uppercase; margin-bottom:3px; }
+    .level-num {
+      font-family:'Playfair Display',serif; font-size:30px; font-weight:900; line-height:1;
+      background:linear-gradient(135deg,#D4C9A8,#E8A44A);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    }
+    .level-title { font-family:'EB Garamond',serif; font-style:italic; font-size:14px; color:rgba(212,201,168,.6); margin-left:8px; }
+    .header-right { text-align:right; }
+    .streak { font-family:'Playfair Display',serif; font-size:15px; color:#E8A44A; }
+    .focus-label { font-size:11px; color:rgba(212,201,168,.4); margin-top:2px; }
+    .xp-total { font-size:10px; color:rgba(212,201,168,.3); margin-top:1px; }
+
+    /* XP bar */
+    .bar-wrap { height:6px; background:rgba(255,255,255,.05); border-radius:3px; overflow:hidden; border:1px solid rgba(232,164,74,.12); margin-bottom:6px; }
+    .bar-fill {
+      height:100%; border-radius:3px;
+      background:linear-gradient(90deg,#E8A44A,#FFD166,#E8A44A); background-size:200% auto;
+      animation:shimmer 3s linear infinite, barGrow .8s ease;
+      transition:width .6s ease;
+    }
+    .bar-labels { display:flex; justify-content:space-between; font-family:'Playfair Display',serif; font-size:10px; color:rgba(212,201,168,.35); }
+
+    /* Daily bar */
+    .daily-bar-wrap { display:flex; align-items:center; gap:10px; padding:7px 12px; background:rgba(255,255,255,.02); border-radius:8px; border:1px solid rgba(255,255,255,.04); margin-top:8px; }
+    .daily-bar-track { flex:1; height:3px; background:rgba(255,255,255,.06); border-radius:2px; overflow:hidden; }
+    .daily-bar-fill { height:100%; border-radius:2px; background:linear-gradient(90deg,#4A9EE8,#A44AE8); transition:width .5s ease; }
+    .daily-label { font-family:'Playfair Display',serif; font-size:10px; color:rgba(212,201,168,.4); white-space:nowrap; letter-spacing:1px; }
+
+    /* ── TABS ── */
+    #tabs { display:flex; overflow-x:auto; border-bottom:1px solid rgba(255,255,255,.05); padding:0 18px; scrollbar-width:none; }
+    #tabs::-webkit-scrollbar { display:none; }
+    .tab-btn {
+      background:none; border:none; padding:11px 13px 9px;
+      display:flex; flex-direction:column; align-items:center; gap:3px;
+      font-family:'Playfair Display',serif; font-size:9.5px; letter-spacing:1.5px;
+      white-space:nowrap; border-bottom:2px solid transparent;
+      transition:all .2s; opacity:.7;
+    }
+    .tab-btn.active { opacity:1; }
+    .tab-btn .tab-icon { font-size:15px; }
+    .tab-badge { font-size:9px; padding:1px 5px; border-radius:8px; margin-top:1px; }
+
+    /* ── CONTENT ── */
+    #content { padding:18px 18px 0; max-width:660px; margin:0 auto; width:100%; }
+    .pillar-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+    .pillar-bar { width:3px; height:22px; border-radius:2px; }
+    .pillar-name { font-family:'Playfair Display',serif; font-size:12px; letter-spacing:2px; text-transform:uppercase; }
+    .pillar-count { font-size:11px; color:rgba(212,201,168,.35); margin-left:auto; }
+
+    /* ── TASK CARDS ── */
+    .sessions { display:flex; flex-direction:column; gap:8px; }
+    .session-card {
+      display:flex; align-items:center; gap:13px; padding:14px 16px;
+      background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.06);
+      border-radius:12px; cursor:pointer; transition:all .18s; user-select:none;
+    }
+    .session-card:active { transform:scale(.98); }
+    .session-card.done { opacity:.5; cursor:default; }
+    .check-circle {
+      width:26px; height:26px; border-radius:50%; flex-shrink:0;
+      border:2px solid rgba(255,255,255,.12); background:transparent;
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; transition:all .25s;
+    }
+    .session-text { flex:1; }
+    .session-label { font-size:14px; line-height:1.45; }
+    .session-focus { font-size:11px; color:rgba(212,201,168,.35); margin-top:2px; }
+    .xp-badge { flex-shrink:0; padding:4px 10px; border-radius:20px; }
+    .xp-badge span { font-family:'Playfair Display',serif; font-weight:700; font-size:13px; }
+    .xp-badge small { font-size:10px; color:rgba(212,201,168,.4); margin-left:2px; }
+
+    /* ── STATS ── */
+    .stats-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; text-align:center; padding:16px 18px; background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.05); border-radius:12px; margin-top:22px; }
+    .stat-val { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; line-height:1; }
+    .stat-lbl { font-size:10px; color:rgba(212,201,168,.45); margin-top:4px; letter-spacing:1px; }
+
+    /* ── REWARDS SECTION ── */
+    .rewards-section { margin-top:22px; padding:16px 18px; background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.05); border-radius:12px; }
+    .rewards-title { font-family:'Playfair Display',serif; font-size:11px; letter-spacing:3px; color:rgba(212,201,168,.4); text-transform:uppercase; margin-bottom:12px; }
+    .rewards-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .reward-card { padding:12px; border-radius:10px; border:1px solid; text-align:center; position:relative; overflow:hidden; }
+    .reward-card.unlocked { cursor:default; }
+    .reward-card.locked { opacity:.4; }
+    .reward-icon { font-size:22px; margin-bottom:5px; }
+    .reward-name { font-family:'Playfair Display',serif; font-size:11px; letter-spacing:1px; }
+    .reward-req { font-size:10px; color:rgba(212,201,168,.4); margin-top:3px; }
+    .reward-badge { position:absolute; top:6px; right:6px; font-size:9px; padding:2px 6px; border-radius:8px; font-family:'Playfair Display',serif; }
+
+    /* ── NOTIFICATION PANEL ── */
+    .notif-section { margin-top:22px; padding:16px 18px; background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.05); border-radius:12px; }
+    .notif-title { font-family:'Playfair Display',serif; font-size:11px; letter-spacing:3px; color:rgba(212,201,168,.4); text-transform:uppercase; margin-bottom:12px; }
+    .notif-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .notif-label { font-size:13px; color:rgba(212,201,168,.8); }
+    .time-input { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:6px 10px; color:#D4C9A8; font-family:'EB Garamond',serif; font-size:14px; width:100px; text-align:center; }
+    .toggle { width:42px; height:24px; border-radius:12px; border:none; position:relative; transition:background .2s; padding:0; }
+    .toggle::after { content:''; position:absolute; top:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .2s; }
+    .toggle.on { background:#E8A44A; }
+    .toggle.on::after { transform:translateX(21px); }
+    .toggle.off { background:rgba(255,255,255,.12); }
+    .toggle.off::after { transform:translateX(3px); }
+    .notif-btn { width:100%; padding:10px; border-radius:10px; border:1px solid rgba(232,164,74,.4); background:rgba(232,164,74,.08); color:#E8A44A; font-family:'Playfair Display',serif; font-size:11px; letter-spacing:2px; margin-top:4px; }
+    .notif-status { font-size:11px; color:rgba(212,201,168,.4); text-align:center; margin-top:8px; }
+
+    /* ── OPTIONS ── */
+    .opts-section { margin-top:20px; text-align:center; }
+    .opts-link { background:none; border:none; font-size:10px; color:rgba(212,201,168,.2); font-family:'Playfair Display',serif; letter-spacing:2px; }
+    .opts-btns { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:4px; }
+    .opts-btn { background:none; border-radius:8px; padding:7px 14px; font-family:'Playfair Display',serif; font-size:10px; letter-spacing:1px; }
+
+    /* ── FLOATING UI ── */
+    .xp-float { position:fixed; pointer-events:none; z-index:9999; font-family:'Playfair Display',serif; font-weight:900; font-size:18px; animation:xpFloat 1.1s ease-out forwards; }
+    .particle { position:fixed; width:7px; height:7px; border-radius:50%; pointer-events:none; z-index:9999; animation:particle .85s ease-out forwards; }
+    .toast {
+      position:fixed; bottom:calc(28px + var(--safe-bot)); left:50%; z-index:8000;
+      min-width:270px; max-width:340px;
+      background:linear-gradient(135deg,#0F1218,#161B22);
+      border-radius:14px; padding:14px 20px;
+      animation:toastIn 2.8s ease forwards;
+    }
+    .toast-title { font-family:'Playfair Display',serif; font-size:10px; letter-spacing:3px; text-transform:uppercase; margin-bottom:5px; }
+    .toast-label { font-size:13px; color:rgba(212,201,168,.75); margin-bottom:8px; line-height:1.4; }
+    .toast-row { display:flex; gap:16px; }
+    .toast-xp { font-family:'Playfair Display',serif; font-weight:700; font-size:14px; }
+    .toast-focus { font-size:13px; color:rgba(212,201,168,.45); }
+
+    .reward-popup {
+      position:fixed; top:50%; left:50%; z-index:9500;
+      transform:translate(-50%,-50%);
+      background:linear-gradient(135deg,#0F1218,#1A1020);
+      border-radius:20px; padding:32px 36px; text-align:center;
+      min-width:260px; box-shadow:0 20px 80px rgba(0,0,0,.8);
+      animation:rewardPop 3.5s ease forwards;
+    }
+    .reward-popup-icon { font-size:52px; margin-bottom:12px; }
+    .reward-popup-title { font-family:'Playfair Display',serif; font-size:11px; letter-spacing:4px; text-transform:uppercase; margin-bottom:8px; }
+    .reward-popup-name { font-family:'Playfair Display',serif; font-size:20px; font-weight:700; margin-bottom:6px; }
+    .reward-popup-desc { font-size:13px; color:rgba(212,201,168,.6); font-style:italic; }
+
+    /* scrollbar global */
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:rgba(232,164,74,.25); border-radius:3px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Ambient orbs -->
+  <div class="orb" style="width:380px;height:380px;top:-120px;right:-80px;background:radial-gradient(circle,rgba(74,158,232,.18) 0%,transparent 70%);animation-duration:6s;"></div>
+  <div class="orb" style="width:280px;height:280px;bottom:-80px;left:-60px;background:radial-gradient(circle,rgba(232,164,74,.14) 0%,transparent 70%);animation-duration:8s;animation-delay:2s;"></div>
+
+  <div id="header">
+    <div class="header-row">
+      <div>
+        <div class="level-label">Codex do Estudante</div>
+        <div style="display:flex;align-items:baseline">
+          <span class="level-num" id="hLevel">Nível 1</span>
+          <span class="level-title" id="hTitle">— Ignorante</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="streak" id="hStreak">🔥 0 dias</div>
+        <div class="focus-label" id="hFocus">⏱ 0m foco</div>
+        <div class="xp-total" id="hXPTotal">0 XP total</div>
+      </div>
+    </div>
+    <div class="bar-wrap"><div class="bar-fill" id="xpBar" style="width:0%"></div></div>
+    <div class="bar-labels">
+      <span id="xpCurrent">0 / 300 XP</span>
+      <span id="xpNext">próximo: 300 XP</span>
+    </div>
+    <div class="daily-bar-wrap">
+      <div class="daily-bar-track"><div class="daily-bar-fill" id="dailyBar" style="width:0%"></div></div>
+      <span class="daily-label" id="dailyLabel">0 / 0 hoje</span>
+    </div>
+  </div>
+
+  <div id="tabs"></div>
+  <div id="content"></div>
+</div>
+
+<!-- Floating layer -->
+<div id="floatLayer" style="position:fixed;inset:0;pointer-events:none;z-index:9990;"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════
+const PILLARS = [
+  {
+    id:"dp", icon:"⚖️", label:"DP & CLT", color:"#E8A44A",
+    sessions:[
+      {id:"dp1",label:"Ler artigos da CLT (30 min)",xp:40,focus:30},
+      {id:"dp2",label:"Estudar rescisão / TRCT a fundo",xp:50,focus:40},
+      {id:"dp3",label:"Revisar cálculo de FGTS (bases, alíquotas)",xp:45,focus:35},
+      {id:"dp4",label:"Estudar adicional noturno / DSR / HE",xp:40,focus:30},
+      {id:"dp5",label:"Aprofundar férias, 13º, avos",xp:40,focus:30},
+      {id:"dp6",label:"Revisar IRRF progressivo (tabelas, deduções)",xp:50,focus:40},
+      {id:"dp7",label:"Estudar INSS: contribuição, bases, tetos",xp:45,focus:35},
+    ]
+  },
+  {
+    id:"esocial", icon:"🖥️", label:"eSocial & Obrigações", color:"#4A9EE8",
+    sessions:[
+      {id:"es1",label:"Estudar leiautes eSocial (S-2200, S-2206...)",xp:55,focus:45},
+      {id:"es2",label:"Estudar DCTFWeb: geração e transmissão",xp:50,focus:40},
+      {id:"es3",label:"Aprofundar EFD-Reinf: eventos R-2010 / R-4000",xp:55,focus:45},
+      {id:"es4",label:"Estudar FGTS Digital: guia, DARF, GRRF",xp:50,focus:40},
+      {id:"es5",label:"Estudar DET: obrigações e prazos",xp:40,focus:30},
+      {id:"es6",label:"Revisar tabelas de incidências eSocial",xp:45,focus:35},
+    ]
+  },
+  {
+    id:"cct", icon:"📋", label:"CCT & Legislação", color:"#6AAE5A",
+    sessions:[
+      {id:"cc1",label:"Ler CCT vigente (comércio / construção)",xp:50,focus:40},
+      {id:"cc2",label:"Mapear cláusulas econômicas de CCT",xp:45,focus:35},
+      {id:"cc3",label:"Estudar súmulas do TST relevantes",xp:55,focus:45},
+      {id:"cc4",label:"Revisar NRs de segurança do trabalho (SST)",xp:45,focus:35},
+      {id:"cc5",label:"Estudar terceirização / contratos especiais",xp:50,focus:40},
+      {id:"cc6",label:"Estudar contrato intermitente / teletrabalho",xp:45,focus:35},
+    ]
+  },
+  {
+    id:"tech", icon:"🤖", label:"Automação & Tech", color:"#A44AE8",
+    sessions:[
+      {id:"tc1",label:"Praticar Python: lógica / estruturas (30 min)",xp:50,focus:40},
+      {id:"tc2",label:"Estudar Selenium / Playwright: seletores",xp:55,focus:45},
+      {id:"tc3",label:"Construir ou melhorar 1 script de automação",xp:70,focus:60},
+      {id:"tc4",label:"Estudar manipulação de PDF / Excel com Python",xp:55,focus:45},
+      {id:"tc5",label:"Praticar React / JS: componente novo",xp:60,focus:50},
+      {id:"tc6",label:"Documentar um script / processo criado",xp:35,focus:25},
+    ]
+  },
+  {
+    id:"direito", icon:"🏛️", label:"Direito Geral", color:"#4AE8B0",
+    sessions:[
+      {id:"dr1",label:"Ler 1 título da Constituição Federal (CF/88)",xp:45,focus:35},
+      {id:"dr2",label:"Estudar direitos fundamentais (art. 5º e ss.)",xp:50,focus:40},
+      {id:"dr3",label:"Revisar organização do Estado / três poderes",xp:40,focus:30},
+      {id:"dr4",label:"Estudar 1 tipo penal do Código Penal",xp:40,focus:30},
+      {id:"dr5",label:"Ler teoria geral do crime (dolo, culpa, nexo)",xp:50,focus:40},
+      {id:"dr6",label:"Estudar direito civil: contratos (noções)",xp:45,focus:35},
+      {id:"dr7",label:"Estudar direito civil: pessoas / capacidade",xp:40,focus:30},
+      {id:"dr8",label:"Ler 1 acórdão / decisão do STF ou STJ",xp:55,focus:45},
+      {id:"dr9",label:"Estudar processo civil: noções introdutórias",xp:45,focus:35},
+      {id:"dr10",label:"Estudar hermenêutica / interpretação da lei",xp:40,focus:30},
+    ]
+  },
+  {
+    id:"espiritualidade", icon:"🕯️", label:"Espiritualidade", color:"#C87AB0",
+    sessions:[
+      {id:"sp1",label:"Leitura doutrinária / Umbanda (30 min)",xp:45,focus:35},
+      {id:"sp2",label:"Estudo de orixás, entidades e fundamentos",xp:50,focus:40},
+      {id:"sp3",label:"Prática de mediunidade / desenvolvimento",xp:60,focus:50},
+      {id:"sp4",label:"Meditação dirigida (15 min)",xp:30,focus:20},
+      {id:"sp5",label:"Reflexão e diário espiritual",xp:25,focus:15},
+      {id:"sp6",label:"Gira / trabalho espiritual presencial",xp:70,focus:60},
+    ]
+  },
+];
+
+const XP_PER_LEVEL = 300;
+const TITLES = ["Ignorante","Curioso","Aprendiz","Estudante","Dedicado","Comprometido","Aplicado","Estudioso","Versado","Letrado","Erudito","Sábio","Mestre","Grão-Mestre","Iluminado"];
+
+const REWARDS = [
+  {id:"r1", icon:"🥉", name:"Primeira Centelha", desc:"Complete sua primeira sessão de estudos", req:"sessions", val:1, color:"#CD7F32"},
+  {id:"r2", icon:"📖", name:"Leitor Dedicado", desc:"Complete 10 sessões no total", req:"sessions", val:10, color:"#4A9EE8"},
+  {id:"r3", icon:"🔥", name:"Chama Viva", desc:"3 dias seguidos de estudo", req:"streak", val:3, color:"#E8A44A"},
+  {id:"r4", icon:"⚡", name:"Estudante Voraz", desc:"50 sessões completadas", req:"sessions", val:50, color:"#A44AE8"},
+  {id:"r5", icon:"🏅", name:"Semana Perfeita", desc:"7 dias seguidos de estudo", req:"streak", val:7, color:"#FFD700"},
+  {id:"r6", icon:"🎓", name:"Bacharel Renasce", desc:"Nível 5 alcançado", req:"level", val:5, color:"#6AAE5A"},
+  {id:"r7", icon:"⚖️", name:"Mestre do DP", desc:"Complete todas as sessões de DP & CLT", req:"pillar", val:"dp", color:"#E8A44A"},
+  {id:"r8", icon:"🏛️", name:"Jurista em Formação", desc:"Complete todas as sessões de Direito", req:"pillar", val:"direito", color:"#4AE8B0"},
+  {id:"r9", icon:"🤖", name:"Automador", desc:"Complete todas as sessões de Tech", req:"pillar", val:"tech", color:"#A44AE8"},
+  {id:"r10", icon:"🏆", name:"Lendário", desc:"Nível 10 alcançado", req:"level", val:10, color:"#FFD700"},
+];
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+function loadState() {
+  const today = new Date().toDateString();
+  let completed = {};
+  try { completed = JSON.parse(localStorage.getItem("eq_done") || "{}"); } catch{}
+  const lastDate = localStorage.getItem("eq_lastdate") || "";
+  let streak = +(localStorage.getItem("eq_streak") || 0);
+  if (lastDate && lastDate !== today) {
+    const yest = new Date(); yest.setDate(yest.getDate()-1);
+    if (lastDate !== yest.toDateString()) streak = 0;
+    completed = {};
+    localStorage.setItem("eq_done", "{}");
+  }
+  return {
+    xp: +(localStorage.getItem("eq_xp") || 0),
+    focusMin: +(localStorage.getItem("eq_focus") || 0),
+    totalSessions: +(localStorage.getItem("eq_total_sessions") || 0),
+    unlockedRewards: JSON.parse(localStorage.getItem("eq_rewards") || "[]"),
+    completed,
+    streak,
+    lastDate,
+    notifEnabled: localStorage.getItem("eq_notif") === "true",
+    notifTime: localStorage.getItem("eq_notif_time") || "20:00",
+    activePillar: 0,
+    showOpts: false,
+  };
+}
+
+let S = loadState();
+const today = new Date().toDateString();
+let floatId = 0;
+
+function saveState() {
+  localStorage.setItem("eq_xp", S.xp);
+  localStorage.setItem("eq_focus", S.focusMin);
+  localStorage.setItem("eq_total_sessions", S.totalSessions);
+  localStorage.setItem("eq_done", JSON.stringify(S.completed));
+  localStorage.setItem("eq_streak", S.streak);
+  localStorage.setItem("eq_lastdate", S.lastDate);
+  localStorage.setItem("eq_rewards", JSON.stringify(S.unlockedRewards));
+  localStorage.setItem("eq_notif", S.notifEnabled);
+  localStorage.setItem("eq_notif_time", S.notifTime);
+}
+
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+function getLevel(xp){ return Math.floor(xp/XP_PER_LEVEL)+1; }
+function getXPInLevel(xp){ return xp%XP_PER_LEVEL; }
+function getTitle(lvl){ return TITLES[Math.min(lvl-1,TITLES.length-1)]; }
+const totalTasks = PILLARS.reduce((a,p)=>a+p.sessions.length,0);
+function doneToday(){ return Object.keys(S.completed).filter(k=>S.completed[k]===today).length; }
+
+function checkRewards(prevUnlocked) {
+  const level = getLevel(S.xp);
+  REWARDS.forEach(r => {
+    if (S.unlockedRewards.includes(r.id)) return;
+    let ok = false;
+    if (r.req === "sessions") ok = S.totalSessions >= r.val;
+    if (r.req === "streak") ok = S.streak >= r.val;
+    if (r.req === "level") ok = level >= r.val;
+    if (r.req === "pillar") {
+      const p = PILLARS.find(p=>p.id===r.val);
+      ok = p && p.sessions.every(s=>S.completed[s.id]===today);
+    }
+    if (ok) {
+      S.unlockedRewards.push(r.id);
+      showRewardPopup(r);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// UI UPDATES
+// ═══════════════════════════════════════════════════════
+function updateHeader() {
+  const level = getLevel(S.xp);
+  const xpIn = getXPInLevel(S.xp);
+  const fh = Math.floor(S.focusMin/60), fm = S.focusMin%60;
+  document.getElementById("hLevel").textContent = `Nível ${level}`;
+  document.getElementById("hTitle").textContent = `— ${getTitle(level)}`;
+  document.getElementById("hStreak").textContent = `🔥 ${S.streak} ${S.streak===1?"dia":"dias"}`;
+  document.getElementById("hFocus").textContent = `⏱ ${fh>0?fh+"h ":""}${fm}m foco`;
+  document.getElementById("hXPTotal").textContent = `${S.xp} XP total`;
+  document.getElementById("xpBar").style.width = `${(xpIn/XP_PER_LEVEL)*100}%`;
+  document.getElementById("xpCurrent").textContent = `${xpIn} / ${XP_PER_LEVEL} XP`;
+  document.getElementById("xpNext").textContent = `próximo: ${XP_PER_LEVEL-xpIn} XP`;
+  const dt = doneToday();
+  document.getElementById("dailyBar").style.width = `${(dt/totalTasks)*100}%`;
+  document.getElementById("dailyLabel").textContent = `${dt} / ${totalTasks} hoje`;
+}
+
+function renderTabs() {
+  const container = document.getElementById("tabs");
+  container.innerHTML = "";
+  PILLARS.forEach((p, i) => {
+    const doneCat = p.sessions.filter(s=>S.completed[s.id]===today).length;
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (S.activePillar===i?" active":"");
+    btn.style.color = S.activePillar===i ? p.color : "rgba(212,201,168,.4)";
+    btn.style.borderBottomColor = S.activePillar===i ? p.color : "transparent";
+    btn.innerHTML = `
+      <span class="tab-icon">${p.icon}</span>
+      <span>${p.label}</span>
+      ${doneCat>0?`<span class="tab-badge" style="background:${p.color}22;color:${p.color}">${doneCat}/${p.sessions.length}</span>`:""}
+    `;
+    btn.onclick = () => { S.activePillar = i; renderAll(); };
+    container.appendChild(btn);
+  });
+}
+
+function renderContent() {
+  const p = PILLARS[S.activePillar];
+  const doneCat = p.sessions.filter(s=>S.completed[s.id]===today).length;
+  const level = getLevel(S.xp);
+  const fh = Math.floor(S.focusMin/60), fm = S.focusMin%60;
+
+  // Sessions
+  let sessionsHTML = p.sessions.map(session => {
+    const done = S.completed[session.id]===today;
+    return `
+      <div class="session-card ${done?"done":""}" data-id="${session.id}" data-pillar="${S.activePillar}"
+        style="border-color:${done?p.color+"44":"rgba(255,255,255,.06)"}; background:${done?p.color+"0C":"rgba(255,255,255,.02)"}">
+        <div class="check-circle" style="border-color:${done?p.color:"rgba(255,255,255,.12)"}; background:${done?p.color+"30":"transparent"}; box-shadow:${done?"0 0 12px "+p.color+"44":"none"}">
+          ${done?"✓":""}
+        </div>
+        <div class="session-text">
+          <div class="session-label" style="color:${done?"rgba(212,201,168,.5)":"#D4C9A8"};text-decoration:${done?"line-through":"none"};font-style:${done?"italic":"normal"}">
+            ${session.label}
+          </div>
+          <div class="session-focus">⏱ ${session.focus} min de foco estimado</div>
+        </div>
+        <div class="xp-badge" style="background:${done?p.color+"15":p.color+"22"};border:1px solid ${p.color+(done?"30":"55")}">
+          <span style="color:${done?p.color+"66":p.color}">+${session.xp}</span><small>XP</small>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // Rewards
+  let rewardsHTML = REWARDS.map(r => {
+    const unlocked = S.unlockedRewards.includes(r.id);
+    return `
+      <div class="reward-card ${unlocked?"unlocked":"locked"}" style="border-color:${r.color+(unlocked?"55":"22")};background:${r.color+(unlocked?"0D":"08")}">
+        ${unlocked?`<div class="reward-badge" style="background:${r.color}22;color:${r.color}">✓ desbloq.</div>`:""}
+        <div class="reward-icon">${r.icon}</div>
+        <div class="reward-name" style="color:${unlocked?r.color:"rgba(212,201,168,.5)"}">${r.name}</div>
+        <div class="reward-req">${r.desc}</div>
+      </div>
+    `;
+  }).join("");
+
+  // Notification section
+  const notifSupported = "Notification" in window && "serviceWorker" in navigator;
+  const notifHTML = notifSupported ? `
+    <div class="notif-section">
+      <div class="notif-title">🔔 Lembretes Diários</div>
+      <div class="notif-row">
+        <span class="notif-label">Lembrete de estudo</span>
+        <button class="toggle ${S.notifEnabled?"on":"off"}" id="notifToggle" onclick="toggleNotif()"></button>
+      </div>
+      <div class="notif-row">
+        <span class="notif-label">Horário</span>
+        <input type="time" class="time-input" id="notifTime" value="${S.notifTime}" onchange="updateNotifTime(this.value)" />
+      </div>
+      <button class="notif-btn" onclick="testNotif()">🔔 Testar Notificação Agora</button>
+      <div class="notif-status" id="notifStatus">${S.notifEnabled?"Lembretes ativos às "+S.notifTime:"Lembretes desativados"}</div>
+    </div>
+  ` : `<div class="notif-section"><div class="notif-status">Notificações não suportadas neste navegador.</div></div>`;
+
+  // Options
+  const optsHTML = `
+    <div class="opts-section">
+      ${!S.showOpts
+        ? `<button class="opts-link" onclick="S.showOpts=true;renderContent()">⚙ opções</button>`
+        : `<div class="opts-btns">
+            <button class="opts-btn" style="border:1px solid rgba(232,164,74,.4);color:#E8A44A" onclick="resetDay()">Reiniciar dia</button>
+            <button class="opts-btn" style="border:1px solid rgba(232,74,74,.4);color:#E84A4A" onclick="resetAll()">Zerar tudo</button>
+            <button class="opts-btn" style="border:1px solid rgba(255,255,255,.1);color:rgba(212,201,168,.4)" onclick="S.showOpts=false;renderContent()">Cancelar</button>
+          </div>`
+      }
+    </div>
+  `;
+
+  document.getElementById("content").innerHTML = `
+    <div class="pillar-header">
+      <div class="pillar-bar" style="background:${p.color};box-shadow:0 0 10px ${p.color}88"></div>
+      <span class="pillar-name" style="color:${p.color}">${p.label}</span>
+      <span class="pillar-count">${doneCat} / ${p.sessions.length} sessões</span>
+    </div>
+    <div class="sessions">${sessionsHTML}</div>
+    <div class="stats-grid">
+      <div><div class="stat-val">${doneToday()}</div><div class="stat-lbl">Sessões hoje</div></div>
+      <div><div class="stat-val">${level}</div><div class="stat-lbl">Nível atual</div></div>
+      <div><div class="stat-val">${fh>0?fh+"h"+fm+"m":fm+"m"}</div><div class="stat-lbl">Foco total</div></div>
+    </div>
+    <div class="rewards-section">
+      <div class="rewards-title">🏆 Conquistas</div>
+      <div class="rewards-grid">${rewardsHTML}</div>
+    </div>
+    ${notifHTML}
+    ${optsHTML}
+  `;
+
+  // Bind session clicks
+  document.querySelectorAll(".session-card:not(.done)").forEach(card => {
+    card.addEventListener("click", e => completeSession(card.dataset.id, e));
+  });
+}
+
+function renderAll() {
+  updateHeader();
+  renderTabs();
+  renderContent();
+}
+
+// ═══════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════
+function completeSession(sessionId, e) {
+  const pillar = PILLARS[S.activePillar];
+  const session = pillar.sessions.find(s=>s.id===sessionId);
+  if (!session || S.completed[sessionId]===today) return;
+
+  const rect = e.currentTarget.getBoundingClientRect();
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+
+  spawnParticles(cx, cy, pillar.color);
+  spawnXPFloat(cx, cy, session.xp, pillar.color);
+
+  S.xp += session.xp;
+  S.focusMin += session.focus;
+  S.totalSessions += 1;
+  S.completed[sessionId] = today;
+  if (S.lastDate !== today) { S.streak++; S.lastDate = today; }
+
+  const prevUnlocked = [...S.unlockedRewards];
+  checkRewards(prevUnlocked);
+  saveState();
+
+  showToast(session.label, session.xp, session.focus, pillar.color);
+  renderAll();
+}
+
+function spawnParticles(cx, cy, color) {
+  const layer = document.getElementById("floatLayer");
+  for (let i = 0; i < 8; i++) {
+    const el = document.createElement("div");
+    el.className = "particle";
+    const dx = (Math.random()-0.5)*80, dy = (Math.random()-0.5)*60 - 20;
+    el.style.cssText = `left:${cx-3}px;top:${cy-3}px;background:${color};box-shadow:0 0 8px ${color};--dx:${dx}px;--dy:${dy}px;`;
+    layer.appendChild(el);
+    setTimeout(()=>el.remove(), 900);
+  }
+}
+
+function spawnXPFloat(cx, cy, xp, color) {
+  const layer = document.getElementById("floatLayer");
+  const el = document.createElement("div");
+  el.className = "xp-float";
+  el.textContent = `+${xp} XP`;
+  el.style.cssText = `left:${cx-30}px;top:${cy-20}px;color:${color};text-shadow:0 0 16px ${color};`;
+  layer.appendChild(el);
+  setTimeout(()=>el.remove(), 1200);
+}
+
+let toastTimer = null;
+function showToast(label, xp, focus, color) {
+  const existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  if (toastTimer) clearTimeout(toastTimer);
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.style.cssText = `border:1px solid ${color}55;box-shadow:0 12px 40px ${color}33;`;
+  el.innerHTML = `
+    <div class="toast-title" style="color:${color}">✦ Sessão Concluída</div>
+    <div class="toast-label">${label}</div>
+    <div class="toast-row">
+      <span class="toast-xp" style="color:${color}">+${xp} XP</span>
+      <span class="toast-focus">+${focus} min foco</span>
+    </div>
+  `;
+  document.body.appendChild(el);
+  toastTimer = setTimeout(()=>el.remove(), 2800);
+}
+
+function showRewardPopup(reward) {
+  setTimeout(() => {
+    const el = document.createElement("div");
+    el.className = "reward-popup";
+    el.style.cssText = `border:2px solid ${reward.color}66;box-shadow:0 20px 80px ${reward.color}33;`;
+    el.innerHTML = `
+      <div class="reward-popup-icon">${reward.icon}</div>
+      <div class="reward-popup-title" style="color:${reward.color}">✦ Conquista Desbloqueada ✦</div>
+      <div class="reward-popup-name" style="color:${reward.color}">${reward.name}</div>
+      <div class="reward-popup-desc">${reward.desc}</div>
+    `;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 3600);
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════════════
+async function requestNotifPermission() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  const perm = await Notification.requestPermission();
+  return perm === "granted";
+}
+
+async function toggleNotif() {
+  if (!S.notifEnabled) {
+    const granted = await requestNotifPermission();
+    if (!granted) {
+      document.getElementById("notifStatus").textContent = "Permissão negada. Habilite nas configurações do navegador.";
+      return;
+    }
+    S.notifEnabled = true;
+    scheduleNotification();
+  } else {
+    S.notifEnabled = false;
+  }
+  saveState();
+  renderContent();
+}
+
+function updateNotifTime(val) {
+  S.notifTime = val;
+  saveState();
+  if (S.notifEnabled) scheduleNotification();
+  document.getElementById("notifStatus").textContent = S.notifEnabled ? "Lembretes ativos às " + val : "Lembretes desativados";
+}
+
+function scheduleNotification() {
+  if (!S.notifEnabled || !("serviceWorker" in navigator)) return;
+  const [h, m] = S.notifTime.split(":").map(Number);
+  const now = new Date();
+  const target = new Date();
+  target.setHours(h, m, 0, 0);
+  if (target <= now) target.setDate(target.getDate()+1);
+  const delay = target - now;
+  navigator.serviceWorker.ready.then(reg => {
+    reg.active && reg.active.postMessage({
+      type: "SCHEDULE_NOTIFICATION",
+      title: "📚 Hora de Estudar!",
+      body: `Você tem ${totalTasks - doneToday()} sessões pendentes hoje. Vamos lá, Paulo!`,
+      delay,
+    });
+  });
+}
+
+function testNotif() {
+  requestNotifPermission().then(granted => {
+    if (!granted) return;
+    navigator.serviceWorker.ready.then(reg => {
+      reg.active && reg.active.postMessage({
+        type:"SCHEDULE_NOTIFICATION",
+        title:"📚 Codex do Estudante",
+        body:"Notificação funcionando! Hora de estudar, Paulo 🔥",
+        delay:1500,
+      });
+      document.getElementById("notifStatus").textContent = "Notificação de teste enviada!";
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// OPTIONS
+// ═══════════════════════════════════════════════════════
+function resetDay() {
+  S.completed = {};
+  S.showOpts = false;
+  saveState();
+  renderAll();
+}
+
+function resetAll() {
+  S = { xp:0, focusMin:0, totalSessions:0, unlockedRewards:[], completed:{}, streak:0, lastDate:"", notifEnabled:S.notifEnabled, notifTime:S.notifTime, activePillar:0, showOpts:false };
+  saveState();
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════
+// SERVICE WORKER + INIT
+// ═══════════════════════════════════════════════════════
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").then(reg => {
+      console.log("SW registrado:", reg.scope);
+      if (S.notifEnabled) scheduleNotification();
+    }).catch(err => console.warn("SW erro:", err));
+  });
+}
+
+renderAll();
+</script>
+</body>
+</html>
